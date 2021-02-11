@@ -28,11 +28,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
 import time
 import uuid
 
 from collections import defaultdict
-from flask import Flask, request
+from flask import Flask, Response, make_response, request
 from pydantic import BaseModel, parse_obj_as
 
 
@@ -88,8 +89,9 @@ app = Flask(__name__)
 @app.route("/users", methods=['GET', 'POST'])
 def handle_users():
     if request.method == 'GET':
-        return { "users": list(users.values()) }
+        return { "users": [u.dict() for u in users.values()] }
     elif request.method == 'POST':
+        user_req = CreateUserRequest.parse_obj(request.json)
         user = User(
           id=f'{uuid.uuid1()}',
           first_name=user_req.first_name,
@@ -99,19 +101,31 @@ def handle_users():
         )
 
         users[user.id] = user
-
-        return user.dict()
+        return user.dict(), 201
     else:
         return { "detail": f"Operation not supported: {request.method}" }, 404
 
 
-@app.route("/users/<user_id>", methods=['GET'])
+@app.route("/users/<user_id>", methods=['GET', 'PUT', 'DELETE'])
 def handle_get_user(user_id: str):
     if user_id not in users:
         return { "detail": "User not found" }, 404
 
     if request.method == 'GET':
-        return {"user": users[user_id].dict()}
+        return users[user_id].dict()
+    elif request.method == 'PUT':
+        upd = request.json
+        if 'id' in upd and upd['id'] != user_id:
+            return { "detail": "Cannot change user ID" }, 400
+        user = User.parse_obj({
+            **users[user_id].dict(),
+            **upd,
+        })
+        users[user_id] = user
+        return user.dict()
+    elif request.method == 'DELETE':
+        del users[user_id]
+        return {}, 204
     else:
         return { "detail": f"Operation not supported: {request.method}" }, 404
 
@@ -134,7 +148,7 @@ def handle_user_files(user_id: str):
           contents=file_req.contents
         )
         files[user_id][f.id] = f
-        return {"id": f.id}
+        return {"id": f.id}, 201
     else:
         return { "detail": f"Operation not supported: {request.method}" }, 404
 
@@ -153,7 +167,7 @@ def handle_delete_user_file(user_id: str, file_id: str):
     if user_id not in files or file_id not in files[user_id]:
         return { "detail": "File not found" }, 404
     del files[user_id][file_id]
-    return "", 204
+    return {}, 204
 
 
 @app.route("/users/<user_id>/files/<file_id>", methods=['GET', 'DELETE'])
@@ -161,9 +175,7 @@ def handle_user_file(user_id: str, file_id: str):
     if request.method == 'GET':
         return handle_get_user_file(user_id, file_id)
     elif request.method == 'DELETE':
-        # Tutorial: Uncomment this function to add an endpoint to delete files.
-        # return handle_delete_user_file(user_id, file_id)
-        pass
+        return handle_delete_user_file(user_id, file_id)
     else:
         return { "detail": f"Operation not supported: {request.method}" }, 404
 
