@@ -41,6 +41,11 @@ def test_default_files(client):
         file_data = json.loads(rv.data.decode('utf-8'))
         assert len(file_data['files']) == 0
 
+def test_get_users_limits(client):
+    response = client.get('/users', query_string = { 'limit': 1 })
+    assert response.status_code == 200
+    assert len(response.json['users']) == 1
+
 def test_user_crud(client):
     kent = {
         "first_name": "Kent",
