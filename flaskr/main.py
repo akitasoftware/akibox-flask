@@ -73,7 +73,16 @@ app = Flask(__name__)
 @app.route("/users", methods=['GET', 'POST'])
 def handle_users():
     if request.method == 'GET':
-        return { "users": [u.dict() for u in users.values()] }
+        limit_str = request.args.get('limit')
+        limit = len(users)
+        if limit_str is not None:
+            try:
+                limit = int(limit_str)
+            except ValueError:
+                return { "detail": "'limit' must be an integer" }, 400
+            if limit <= 0:
+                return { "detail": "'limit' must be greater than zero" }, 400 
+        return { "users": [u.dict() for u in users.values()][:limit] }
     elif request.method == 'POST':
         user_req = CreateUserRequest.parse_obj(request.json)
         user = User(

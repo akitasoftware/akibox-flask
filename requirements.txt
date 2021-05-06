@@ -1,4 +1,4 @@
-akita-flask==0.0.1
+akita-flask==0.0.3
 akita-har==0.0.1
 attrs==20.3.0
 click==7.1.2
